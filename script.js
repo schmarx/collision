@@ -41,10 +41,15 @@ window.onload = e => {
     canvas.width = xWindow;
     canvas.height = yWindow;
 
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.font = "24px sans-serif"
+
+    // ctx.scale(1.75, 1.75);
 
     // ----- params -----
-    let obj_count = 500;
-    ctx.fillStyle = "#ffffff";
+    let obj_count = 50;
+    ctx.fillStyle = "#000000";
     let damping = 1;
 
     /** @type {obj[]} */
@@ -65,16 +70,16 @@ window.onload = e => {
     function run_sim(time) {
         requestAnimationFrame(run_sim);
 
-        let dt = (time - prev_update) / 1000; // seconds
+        let dt_actual = (time - prev_update) / 1000; // seconds
+        let dt = 0.01;
 
-        // ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, xWindow, yWindow);
+        ctx.clearRect(0, 0, xWindow, yWindow);
 
         for (let i = 0; i < objs.length; i++) {
             let p = objs[i];
 
             vel2 = p.vel.x ** 2 + p.vel.y ** 2;
-            ctx.strokeStyle = `rgba(0, 0, 0, ${vel2 / 500000})`;
+            ctx.fillStyle = `rgba(0, 100, 200, ${vel2 / 500000})`;
 
             // ----- update -----
             p.pos.x += p.vel.x * dt;
@@ -106,8 +111,11 @@ window.onload = e => {
             ctx.beginPath();
             ctx.ellipse(p.pos.x, p.pos.y, p.size, p.size, 0, 0, 2 * Math.PI);
             // ctx.rect(p.pos.x - p.size, p.pos.y - p.size, p.size * 2, p.size * 2);
-            ctx.stroke();
+            ctx.fill();
         }
+
+        ctx.fillStyle = `#000000`;
+        ctx.fillText(`${Math.round(1 / dt_actual)} fps`, xWindow, 0);
 
         prev_update = time;
 
