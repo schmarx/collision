@@ -39,27 +39,32 @@ class obj {
         return Math.sqrt(this.vel.x ** 2 + this.vel.y ** 2)
     }
 
-    /** implemented from equations found on Wikipedia (https://en.wikipedia.org/wiki/Elastic_collision) */
-    collide(p2, p2_vel) {
-        let mass = 2 * p2.m / (p2.m + this.m);
-        let inner = (this.vel.x - p2_vel.x) * (this.pos.x - p2.pos.x) + (this.vel.y - p2_vel.y) * (this.pos.y - p2.pos.y);
-        let norm = (this.pos.x - p2.pos.x) * (this.pos.x - p2.pos.x) + (this.pos.y - p2.pos.y) * (this.pos.y - p2.pos.y);
-        let inner_norm = inner / norm;
-        let scale = mass * inner_norm;
+    /** 
+     * implemented from equations found on Wikipedia (https://en.wikipedia.org/wiki/Inelastic_collision)
+     * 
+     * @param {obj} p2 
+     * @param {vec} p2_vel 
+     */
+    collide(p2) {
+        let dx = this.pos.x - p2.pos.x;
+        let dy = this.pos.y - p2.pos.y;
+        let d = Math.sqrt(dx ** 2 + dy ** 2);
 
-        this.vel_next.x += scale * (p2.pos.x - this.pos.x);
-        this.vel_next.y += scale * (p2.pos.y - this.pos.y);
-    }
+        let nx = dx / d;
+        let ny = dy / d;
 
-    collide_vel_broken(v1, t1, m1, v2, t2, m2, phi) {
-        let mag_a = v1 * Math.cos(t1 - phi) * (m1 - m2);
-        let mag_b = 2 * m2 * v2 * Math.cos(t2 - phi);
-        let mag_c = v1 * Math.sin(t1 - phi);
+        // 0 for perfectly inelastic, 1 for perfectly elastic
+        let C = 0;
 
-        // console.log(mag_a, mag_b, mag_c, v1, v2, rad_to_deg(t1), rad_to_deg(t2), rad_to_deg(phi));
+        let pre = (1 + C) * this.m * p2.m / (this.m + p2.m);
 
-        this.vel.x = (mag_a + mag_b) * Math.cos(phi) / (m1 + m2) + mag_c * Math.cos(phi + Math.PI / 2);
-        this.vel.y = (mag_a + mag_b) * Math.sin(phi) / (m1 + m2) + mag_c * Math.sin(phi + Math.PI / 2);
+        let Jn = pre * ((p2.vel.x - this.vel.x) * nx + (p2.vel.y - this.vel.y) * ny);
+
+        this.vel_next.x += Jn * nx / this.m;
+        this.vel_next.y += Jn * ny / this.m;
+
+        p2.vel_next.x -= Jn * nx / p2.m;
+        p2.vel_next.y -= Jn * ny / p2.m;
     }
 }
 
@@ -85,10 +90,8 @@ window.onload = e => {
     ctx.textBaseline = "top";
     ctx.font = "24px sans-serif"
 
-    // ctx.scale(1.75, 1.75);
-
     // ----- params -----
-    let obj_count = 20;
+    let obj_count = 50;
     ctx.fillStyle = "#000000";
     let damping = 1;
 
@@ -169,41 +172,14 @@ window.onload = e => {
                 let closeness = (p1.size + p2.size) - d;
                 if (closeness >= 0) {
 
-                    /* 1D
-                    let p1_next_x = (p1.vel.x * (p1.size - p2.size) + p2.vel.x * 2 * p2.size) / (p1.size + p2.size);
-                    p2.vel.x = (p2.vel.x * (p2.size - p1.size) + p1.vel.x * 2 * p1.size) / (p1.size + p2.size);
+                    p1.collide(p2);
 
-                    p1.vel.x = p1_next_x;
-                    */
-
-                    let phi = Math.atan((p1.pos.y - p2.pos.y) / (p1.pos.x - p2.pos.x)) - Math.PI / 2;
-
-                    let v1 = p1.get_vel();
-                    let v2 = p2.get_vel();
-
-                    let t1 = 0;
-                    let t2 = 0;
-                    if (v1 != 0) t1 = Math.acos(p1.vel.x / v1);
-                    if (v2 != 0) t2 = Math.acos(p2.vel.x / v2);
-
-
-                    let p2_vel = new vec(p2.vel.x, p2.vel.y);
-                    p2.collide(p1, p1.vel);
-                    p1.collide(p2, p2_vel);
-
+                    // move the objects away from eachother
                     p1.pos.x += dx * closeness / (2 * d);
                     p2.pos.x -= dx * closeness / (2 * d);
 
                     p1.pos.y += dy * closeness / (2 * d);
                     p2.pos.y -= dy * closeness / (2 * d);
-
-
-
-
-                    // move the objects away from eachother
-                    // if (p2.pos.y > p1.pos.y) p2.pos.y -= closeness;
-                    // else p1.pos.y -= closeness;
-                    // p2.pos.y += closeness;
                 }
             }
 
@@ -220,7 +196,7 @@ window.onload = e => {
             mv += p.m * Math.sqrt(p.vel.x ** 2 + p.vel.y ** 2);
         }
 
-        console.log(ke, mv)
+        // console.log(ke, mv)
 
         ctx.fillStyle = `#000000`;
         ctx.fillText(`${Math.round(1 / dt_actual)} fps`, xWindow, 0);
