@@ -9,6 +9,13 @@ class vec {
     }
 }
 
+let params = {
+    // 0 for perfectly inelastic, 1 for perfectly elastic
+    C: 1,
+    obj_count: 3000,
+    acc: true
+}
+
 class obj {
     /** @type {vec} */
     pos;
@@ -53,19 +60,69 @@ class obj {
         let nx = dx / d;
         let ny = dy / d;
 
-        // 0 for perfectly inelastic, 1 for perfectly elastic
-        let C = 0;
-
-        let pre = (1 + C) * this.m * p2.m / (this.m + p2.m);
+        let pre = (1 + params.C) * this.m * p2.m / (this.m + p2.m);
 
         let Jn = pre * ((p2.vel.x - this.vel.x) * nx + (p2.vel.y - this.vel.y) * ny);
 
+        if (Jn / this.m < 2) return;
         this.vel_next.x += Jn * nx / this.m;
         this.vel_next.y += Jn * ny / this.m;
 
         p2.vel_next.x -= Jn * nx / p2.m;
         p2.vel_next.y -= Jn * ny / p2.m;
     }
+}
+
+function create_range(value, min, max, name, params) {
+    let controls = document.getElementById("controls");
+
+    let control = document.createElement("input");
+    let label = document.createElement("label");
+
+    control.type = "range";
+
+    control.min = min;
+    control.max = max;
+    control.step = 0.01;
+    control.value = value;
+
+    control.id = name;
+    control.name = name;
+
+    label.htmlFor = name;
+    label.innerText = name + ` (${value})`;
+    params[name] = Number(value);
+
+    control.onchange = e => {
+        label.innerText = name + ` (${e.currentTarget.value})`;
+        params[name] = Number(e.currentTarget.value);
+    }
+
+    controls.appendChild(label);
+    controls.appendChild(control);
+}
+
+function create_check(value, name, params) {
+    let controls = document.getElementById("controls");
+
+    let control = document.createElement("input");
+    let label = document.createElement("label");
+
+    control.type = "checkbox";
+    control.checked = value;
+    control.id = name;
+    control.name = name;
+
+    label.htmlFor = name;
+    label.innerText = name + ` (${value})`;
+
+    control.onchange = e => {
+        label.innerText = name + ` (${e.currentTarget.checked})`;
+        params[name] = e.currentTarget.checked;
+    }
+
+    controls.appendChild(label);
+    controls.appendChild(control);
 }
 
 window.onload = e => {
@@ -78,7 +135,7 @@ window.onload = e => {
     // let yWindow = Math.min(parent.clientHeight, parent.clientWidth);
     // let xWindow = yWindow;
     let yWindow = parent.clientHeight;
-    let xWindow = parent.clientWidth;
+    let xWindow = parent.clientWidth - 300;
 
     let fontHeight = 16;
     let fontWidth = fontHeight * 11 / 20;
@@ -91,21 +148,37 @@ window.onload = e => {
     ctx.font = "24px sans-serif"
 
     // ----- params -----
-    let obj_count = 50;
     ctx.fillStyle = "#000000";
-    let damping = 1;
+    let damping = 0.8;
+
+    let lookup_size = params.obj_count * (params.obj_count - 1) / 2;
+    let active_collisions = new Array(lookup_size).fill(false);
 
     /** @type {obj[]} */
     let objs = [];
 
-    for (let index = 0; index < obj_count; index++) {
+    for (let index = 0; index < params.obj_count; index++) {
         let pos = new vec(Math.random() * xWindow, Math.random() * yWindow);
+        let vel = new vec(Math.random() * 1000 - 500, Math.random() * 1000 - 500);
+        let acc = new vec(0, 500);
+
+        let size = 80 * (Math.random() + 0.1);
+        size = 2;
+        objs.push(new obj(pos, vel, acc, size));
+    }
+
+    canvas.onclick = e => {
+        let pos = new vec(e.clientX, e.clientY);
         let vel = new vec(Math.random() * 1000 - 500, Math.random() * 1000 - 500);
         let acc = new vec(0, 500);
 
         let size = 80 * (Math.random() + 0.1);
         objs.push(new obj(pos, vel, acc, size));
     }
+
+    // ----- inputs -----
+    create_range(0.5, 0, 1, "C", params);
+    create_check(true, "acc", params);
 
     let prev_update = 0;
     function run_sim(time) {
@@ -125,9 +198,6 @@ window.onload = e => {
             p.pos.x += p.vel.x * dt;
             p.pos.y += p.vel.y * dt;
 
-            p.vel.x += p.acc.x * dt;
-            p.vel.y += p.acc.y * dt;
-
             if (p.pos.x > xWindow - p.size) {
                 p.pos.x = xWindow - p.size;
                 p.vel.x *= -damping;
@@ -144,6 +214,14 @@ window.onload = e => {
                 p.vel.y *= -damping;
             }
 
+            if (params.acc) {
+                p.vel.x += p.acc.x * dt;
+                p.vel.y += p.acc.y * dt;
+            }
+
+            if (Math.abs(p.vel.x) < 5) p.vel.x = 0;
+            if (Math.abs(p.vel.y) < 5) p.vel.y = 0;
+
 
             p.vel_next.x = p.vel.x;
             p.vel_next.y = p.vel.y;
@@ -158,7 +236,7 @@ window.onload = e => {
             ctx.fill();
         }
 
-
+        let lookup_index = 0;
         for (let i = 0; i < objs.length; i++) {
             let p1 = objs[i];
             for (let j = i + 1; j < objs.length; j++) {
@@ -171,16 +249,21 @@ window.onload = e => {
 
                 let closeness = (p1.size + p2.size) - d;
                 if (closeness >= 0) {
+                    if (!active_collisions[lookup_index]) {
+                        // active_collisions[lookup_index] = true;
+                        p1.collide(p2);
 
-                    p1.collide(p2);
+                        // move the objects away from eachother
 
-                    // move the objects away from eachother
-                    p1.pos.x += dx * closeness / (2 * d);
-                    p2.pos.x -= dx * closeness / (2 * d);
+                        p1.pos.x += dx * closeness / (2 * d);
+                        p2.pos.x -= dx * closeness / (2 * d);
 
-                    p1.pos.y += dy * closeness / (2 * d);
-                    p2.pos.y -= dy * closeness / (2 * d);
-                }
+                        p1.pos.y += dy * closeness / (2 * d);
+                        p2.pos.y -= dy * closeness / (2 * d);
+                    }
+                } else active_collisions[lookup_index] = false;
+
+                lookup_index++;
             }
 
             p1.vel.x = p1.vel_next.x;
