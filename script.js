@@ -12,7 +12,7 @@ class vec {
 let params = {
     // 0 for perfectly inelastic, 1 for perfectly elastic
     C: 1,
-    obj_count: 3000,
+    obj_count: 1000,
     acc: true
 }
 
@@ -191,8 +191,8 @@ window.onload = e => {
             let p = objs[i];
 
             let vel2 = p.vel.x ** 2 + p.vel.y ** 2;
-            vel2 = 500000;
-            ctx.fillStyle = `rgba(0, 100, 200, ${vel2 / 500000})`;
+            // ctx.fillStyle = `rgba(0, 100, 200, ${vel2 / 500000})`;
+            ctx.fillStyle = `rgba(0, 100, 200, 1)`;
 
             // ----- update -----
             p.pos.x += p.vel.x * dt;
@@ -204,23 +204,19 @@ window.onload = e => {
             } else if (p.pos.x < p.size) {
                 p.pos.x = p.size;
                 p.vel.x *= -damping;
-            }
+            } else if (params.acc) p.vel.x += p.acc.x * dt;
 
             if (p.pos.y > yWindow - p.size) {
+                if (i == objs.length - 1) console.log("hit")
                 p.pos.y = yWindow - p.size;
                 p.vel.y *= -damping;
             } else if (p.pos.y < p.size) {
                 p.pos.y = p.size;
                 p.vel.y *= -damping;
-            }
+            } if (params.acc) p.vel.y += p.acc.y * dt;
 
-            if (params.acc) {
-                p.vel.x += p.acc.x * dt;
-                p.vel.y += p.acc.y * dt;
-            }
-
-            if (Math.abs(p.vel.x) < 5) p.vel.x = 0;
-            if (Math.abs(p.vel.y) < 5) p.vel.y = 0;
+            // if (Math.abs(p.vel.x) < 5) p.vel.x = 0;
+            // if (Math.abs(p.vel.y) < 5) p.vel.y = 0;
 
 
             p.vel_next.x = p.vel.x;
