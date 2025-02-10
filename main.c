@@ -25,14 +25,22 @@ sfRenderWindow *window;
 sfRenderStates states;
 sfEvent event;
 
+sfThread **threads;
+sfMutex *mutex;
+int *params;
+
 // TODO: double rather than float?
 float C = 0;
 float PI = 3.1415926535897932384626433832795;
-int count = 1000;
+int count = 4000;
 float damping = 0.8;
 
-int max_x = 1000;
-int max_y = 1000;
+float r = 4;
+
+int max_x = 800;
+int max_y = 800;
+
+int thread_count = 16;
 
 void draw(float dt) {
 	for (int i = 0; i < count; i++) {
@@ -71,10 +79,11 @@ void draw(float dt) {
 	}
 }
 
-void interactions() {
-	for (int i = 0; i < count; i++) {
+void interact(int params[]) {
+	int start = params[0];
+	int end = params[1];
+	for (int i = start; i < end; i++) {
 		for (int j = i + 1; j < count; j++) {
-
 			float dx = objs[i].pos.x - objs[j].pos.x;
 			float dy = objs[i].pos.y - objs[j].pos.y;
 
@@ -99,6 +108,21 @@ void interactions() {
 	}
 }
 
+void interactions() {
+	for (int i = 0; i < thread_count; i++) {
+		params[2 * i] = i * count / thread_count;
+		params[2 * i + 1] = (i + 1) * count / thread_count;
+
+		threads[i] = sfThread_create(&interact, &params[2 * i]);
+		sfThread_launch(threads[i]);
+	}
+
+	for (int i = 0; i < thread_count; i++) {
+		sfThread_wait(threads[i]);
+		sfThread_destroy(threads[i]);
+	}
+}
+
 void collide(int i1, int i2, obj *objs) {
 	sfVector2f pos1 = objs[i1].pos;
 	sfVector2f pos2 = objs[i2].pos;
@@ -114,7 +138,7 @@ void collide(int i1, int i2, obj *objs) {
 
 	float Jn = pre * ((objs[i2].vel.x - objs[i1].vel.x) * nx + (objs[i2].vel.y - objs[i1].vel.y) * ny);
 
-	// if (Jn / objs[i1].m < 2) return;
+	if (Jn / objs[i1].m < 2) return;
 	objs[i1].vel_next.x += Jn * nx / objs[i1].m;
 	objs[i1].vel_next.y += Jn * ny / objs[i1].m;
 
@@ -127,9 +151,12 @@ void init() {
 	window = sfRenderWindow_create(mode, "Collision", sfResize | sfClose, NULL);
 	states = sfRenderStates_default();
 
+	threads = malloc(sizeof(sfThread *) * thread_count);
+	mutex = sfMutex_create();
+	params = malloc(sizeof(int) * 2 * thread_count);
+
 	objs = malloc(sizeof(obj) * count);
 
-	float r = 10;
 	for (int i = 0; i < count; i++) {
 		sfCircleShape *shape = sfCircleShape_create();
 		sfVector2f origin = {r, r};
@@ -156,6 +183,14 @@ void init() {
 	}
 }
 
+void end() {
+	free(objs);
+	free(params);
+	free(threads);
+
+	sfMutex_destroy(mutex);
+}
+
 int main(int argc, char *argv[]) {
 	init();
 	// sfRenderWindow_setVerticalSyncEnabled(window, 1);
@@ -178,14 +213,15 @@ int main(int argc, char *argv[]) {
 
 		while (sfRenderWindow_pollEvent(window, &event)) {
 			if (event.type == sfEvtClosed) {
-				free(objs);
 				sfRenderWindow_close(window);
+				end();
 			}
 		}
 
 		sfRenderWindow_clear(window, sfBlack);
 
-		float dt = (float)sfClock_restart(timer).microseconds / 100000;
+		// float dt = (float)sfClock_restart(timer).microseconds / 100000;
+		float dt = 0.1;
 
 		sfInt64 t0 = sfClock_restart(logger).microseconds;
 		draw(dt);
