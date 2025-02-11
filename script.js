@@ -12,7 +12,7 @@ class vec {
 let params = {
     // 0 for perfectly inelastic, 1 for perfectly elastic
     C: 1,
-    obj_count: 1000,
+    obj_count: 6000,
     acc: true
 }
 
@@ -152,7 +152,6 @@ window.onload = e => {
     let damping = 0.8;
 
     let lookup_size = params.obj_count * (params.obj_count - 1) / 2;
-    let active_collisions = new Array(lookup_size).fill(false);
 
     /** @type {obj[]} */
     let objs = [];
@@ -187,54 +186,55 @@ window.onload = e => {
 
         ctx.clearRect(0, 0, xWindow, yWindow);
 
+        let t0 = Date.now();
         for (let i = 0; i < objs.length; i++) {
-            let p = objs[i];
+            let p1 = objs[i];
 
-            let vel2 = p.vel.x ** 2 + p.vel.y ** 2;
             // ctx.fillStyle = `rgba(0, 100, 200, ${vel2 / 500000})`;
             ctx.fillStyle = `rgba(0, 100, 200, 1)`;
 
             // ----- update -----
-            p.pos.x += p.vel.x * dt;
-            p.pos.y += p.vel.y * dt;
+            p1.pos.x += p1.vel.x * dt;
+            p1.pos.y += p1.vel.y * dt;
 
-            if (p.pos.x > xWindow - p.size) {
-                p.pos.x = xWindow - p.size;
-                p.vel.x *= -damping;
-            } else if (p.pos.x < p.size) {
-                p.pos.x = p.size;
-                p.vel.x *= -damping;
-            } else if (params.acc) p.vel.x += p.acc.x * dt;
+            if (p1.pos.x > xWindow - p1.size) {
+                p1.pos.x = xWindow - p1.size;
+                p1.vel.x *= -damping;
+            } else if (p1.pos.x < p1.size) {
+                p1.pos.x = p1.size;
+                p1.vel.x *= -damping;
+            } else if (params.acc) p1.vel.x += p1.acc.x * dt;
 
-            if (p.pos.y > yWindow - p.size) {
-                if (i == objs.length - 1) console.log("hit")
-                p.pos.y = yWindow - p.size;
-                p.vel.y *= -damping;
-            } else if (p.pos.y < p.size) {
-                p.pos.y = p.size;
-                p.vel.y *= -damping;
-            } if (params.acc) p.vel.y += p.acc.y * dt;
+            if (p1.pos.y > yWindow - p1.size) {
+                p1.pos.y = yWindow - p1.size;
+                p1.vel.y *= -damping;
+            } else if (p1.pos.y < p1.size) {
+                p1.pos.y = p1.size;
+                p1.vel.y *= -damping;
+            } if (params.acc) p1.vel.y += p1.acc.y * dt;
 
-            // if (Math.abs(p.vel.x) < 5) p.vel.x = 0;
-            // if (Math.abs(p.vel.y) < 5) p.vel.y = 0;
+            // if (Math.abs(p1.vel.x) < 5) p1.vel.x = 0;
+            // if (Math.abs(p1.vel.y) < 5) p1.vel.y = 0;
 
 
-            p.vel_next.x = p.vel.x;
-            p.vel_next.y = p.vel.y;
+            p1.vel_next.x = p1.vel.x;
+            p1.vel_next.y = p1.vel.y;
 
-            // if (Math.abs(p.vel.x) < 0.2) p.vel.x = 0;
-            // if (Math.abs(p.vel.y) < 0.2) p.vel.y = 0;
+            // if (Math.abs(p1.vel.x) < 0.2) p1.vel.x = 0;
+            // if (Math.abs(p1.vel.y) < 0.2) p1.vel.y = 0;
 
             // ----- draw -----
             ctx.beginPath();
-            ctx.ellipse(p.pos.x, p.pos.y, p.size, p.size, 0, 0, 2 * Math.PI);
-            // ctx.rect(p.pos.x - p.size, p.pos.y - p.size, p.size * 2, p.size * 2);
+            ctx.ellipse(p1.pos.x, p1.pos.y, p1.size, p1.size, 0, 0, 2 * Math.PI);
+            // ctx.rect(p1.pos.x - p1.size, p1.pos.y - p1.size, p1.size * 2, p1.size * 2);
             ctx.fill();
         }
 
-        let lookup_index = 0;
+        let t1 = Date.now();
+
         for (let i = 0; i < objs.length; i++) {
             let p1 = objs[i];
+
             for (let j = i + 1; j < objs.length; j++) {
                 let p2 = objs[j];
 
@@ -245,35 +245,33 @@ window.onload = e => {
 
                 let closeness = (p1.size + p2.size) - d;
                 if (closeness >= 0) {
-                    if (!active_collisions[lookup_index]) {
-                        // active_collisions[lookup_index] = true;
-                        p1.collide(p2);
+                    p1.collide(p2);
 
-                        // move the objects away from eachother
+                    // move the objects away from eachother
 
-                        p1.pos.x += dx * closeness / (2 * d);
-                        p2.pos.x -= dx * closeness / (2 * d);
+                    p1.pos.x += dx * closeness / (2 * d);
+                    p2.pos.x -= dx * closeness / (2 * d);
 
-                        p1.pos.y += dy * closeness / (2 * d);
-                        p2.pos.y -= dy * closeness / (2 * d);
-                    }
-                } else active_collisions[lookup_index] = false;
-
-                lookup_index++;
+                    p1.pos.y += dy * closeness / (2 * d);
+                    p2.pos.y -= dy * closeness / (2 * d);
+                }
             }
 
             p1.vel.x = p1.vel_next.x;
             p1.vel.y = p1.vel_next.y;
         }
+        let t2 = Date.now();
 
-        let ke = 0;
-        let mv = 0;
-        for (let i = 0; i < objs.length; i++) {
-            let p = objs[i];
+        console.log(`draw: ${t1 - t0}ms\tcollide: ${t2 - t1}ms`);
 
-            ke += 0.5 * p.m * (p.vel.x ** 2 + p.vel.y ** 2);
-            mv += p.m * Math.sqrt(p.vel.x ** 2 + p.vel.y ** 2);
-        }
+        // let ke = 0;
+        // let mv = 0;
+        // for (let i = 0; i < objs.length; i++) {
+        //     let p = objs[i];
+
+        //     ke += 0.5 * p.m * (p.vel.x ** 2 + p.vel.y ** 2);
+        //     mv += p.m * Math.sqrt(p.vel.x ** 2 + p.vel.y ** 2);
+        // }
 
         // console.log(ke, mv)
 
