@@ -12,7 +12,8 @@ class vec {
 let params = {
     // 0 for perfectly inelastic, 1 for perfectly elastic
     C: 1,
-    obj_count: 6000,
+    damping: 0.8,
+    obj_count: 1000,
     acc: true
 }
 
@@ -125,17 +126,132 @@ function create_check(value, name, params) {
     controls.appendChild(control);
 }
 
-window.onload = e => {
+let ctx;
+let yWindow;
+let xWindow;
+
+let prev_update = 0;
+
+function draw(dt) {
+    for (let i = 0; i < objs.length; i++) {
+        let p1 = objs[i];
+
+        // ctx.fillStyle = `rgba(0, 100, 200, ${vel2 / 500000})`;
+        ctx.fillStyle = `rgba(0, 100, 200, 1)`;
+
+        // ----- update -----
+        p1.pos.x += p1.vel.x * dt;
+        p1.pos.y += p1.vel.y * dt;
+
+        if (p1.pos.x > xWindow - p1.size) {
+            p1.pos.x = xWindow - p1.size;
+            p1.vel.x *= -params.damping;
+        } else if (p1.pos.x < p1.size) {
+            p1.pos.x = p1.size;
+            p1.vel.x *= -params.damping;
+        } else if (params.acc) p1.vel.x += p1.acc.x * dt;
+
+        if (p1.pos.y > yWindow - p1.size) {
+            p1.pos.y = yWindow - p1.size;
+            p1.vel.y *= -params.damping;
+        } else if (p1.pos.y < p1.size) {
+            p1.pos.y = p1.size;
+            p1.vel.y *= -params.damping;
+        } if (params.acc) p1.vel.y += p1.acc.y * dt;
+
+        // if (Math.abs(p1.vel.x) < 5) p1.vel.x = 0;
+        // if (Math.abs(p1.vel.y) < 5) p1.vel.y = 0;
+
+
+        p1.vel_next.x = p1.vel.x;
+        p1.vel_next.y = p1.vel.y;
+
+        // if (Math.abs(p1.vel.x) < 0.2) p1.vel.x = 0;
+        // if (Math.abs(p1.vel.y) < 0.2) p1.vel.y = 0;
+
+        // ----- draw -----
+        ctx.beginPath();
+        ctx.ellipse(p1.pos.x, p1.pos.y, p1.size, p1.size, 0, 0, 2 * Math.PI);
+        // ctx.rect(p1.pos.x - p1.size, p1.pos.y - p1.size, p1.size * 2, p1.size * 2);
+        ctx.fill();
+    }
+}
+
+function interactions() {
+    for (let i = 0; i < objs.length; i++) {
+        let p1 = objs[i];
+
+        for (let j = i + 1; j < objs.length; j++) {
+            let p2 = objs[j];
+
+            let dx = p1.pos.x - p2.pos.x;
+            let dy = p1.pos.y - p2.pos.y;
+
+            let d = Math.sqrt(dx ** 2 + dy ** 2);
+
+            let closeness = (p1.size + p2.size) - d;
+            if (closeness >= 0) {
+                p1.collide(p2);
+
+                // move the objects away from eachother
+
+                p1.pos.x += dx * closeness / (2 * d);
+                p2.pos.x -= dx * closeness / (2 * d);
+
+                p1.pos.y += dy * closeness / (2 * d);
+                p2.pos.y -= dy * closeness / (2 * d);
+            }
+        }
+
+        p1.vel.x = p1.vel_next.x;
+        p1.vel.y = p1.vel_next.y;
+    }
+}
+
+function run_sim(time) {
+    let dt_actual = (time - prev_update) / 1000; // seconds
+    let dt = 0.01;
+
+    ctx.clearRect(0, 0, xWindow, yWindow);
+
+    let t0 = Date.now();
+    draw(dt);
+    let t1 = Date.now();
+    interactions();
+    let t2 = Date.now();
+
+    console.log(`draw: ${t1 - t0}ms\tcollide: ${t2 - t1}ms`);
+
+    // let ke = 0;
+    // let mv = 0;
+    // for (let i = 0; i < objs.length; i++) {
+    //     let p = objs[i];
+
+    //     ke += 0.5 * p.m * (p.vel.x ** 2 + p.vel.y ** 2);
+    //     mv += p.m * Math.sqrt(p.vel.x ** 2 + p.vel.y ** 2);
+    // }
+
+    // console.log(ke, mv)
+
+    ctx.fillStyle = `#000000`;
+    ctx.fillText(`${Math.round(1 / dt_actual)} fps`, xWindow, 0);
+
+    prev_update = time;
+
+    requestAnimationFrame(run_sim);
+}
+
+function init() {
     /** @type {HTMLCanvasElement} */
     let canvas = document.getElementById("canvas");
     let parent = canvas.parentElement;
 
-    let ctx = canvas.getContext("2d");
+    ctx = canvas.getContext("2d");
 
     // let yWindow = Math.min(parent.clientHeight, parent.clientWidth);
     // let xWindow = yWindow;
-    let yWindow = parent.clientHeight;
-    let xWindow = parent.clientWidth - 300;
+    yWindow = parent.clientHeight;
+    xWindow = parent.clientWidth - 300;
 
     let fontHeight = 16;
     let fontWidth = fontHeight * 11 / 20;
@@ -149,12 +265,8 @@ window.onload = e => {
 
     // ----- params -----
     ctx.fillStyle = "#000000";
-    let damping = 0.8;
 
     let lookup_size = params.obj_count * (params.obj_count - 1) / 2;
-
-    /** @type {obj[]} */
-    let objs = [];
 
     for (let index = 0; index < params.obj_count; index++) {
         let pos = new vec(Math.random() * xWindow, Math.random() * yWindow);
@@ -178,110 +290,12 @@ window.onload = e => {
     // ----- inputs -----
     create_range(0.5, 0, 1, "C", params);
     create_check(true, "acc", params);
+}
 
-    let prev_update = 0;
-    function run_sim(time) {
-        let dt_actual = (time - prev_update) / 1000; // seconds
-        let dt = 0.01;
+/** @type {obj[]} */
+let objs = [];
 
-        ctx.clearRect(0, 0, xWindow, yWindow);
-
-        let t0 = Date.now();
-        for (let i = 0; i < objs.length; i++) {
-            let p1 = objs[i];
-
-            // ctx.fillStyle = `rgba(0, 100, 200, ${vel2 / 500000})`;
-            ctx.fillStyle = `rgba(0, 100, 200, 1)`;
-
-            // ----- update -----
-            p1.pos.x += p1.vel.x * dt;
-            p1.pos.y += p1.vel.y * dt;
-
-            if (p1.pos.x > xWindow - p1.size) {
-                p1.pos.x = xWindow - p1.size;
-                p1.vel.x *= -damping;
-            } else if (p1.pos.x < p1.size) {
-                p1.pos.x = p1.size;
-                p1.vel.x *= -damping;
-            } else if (params.acc) p1.vel.x += p1.acc.x * dt;
-
-            if (p1.pos.y > yWindow - p1.size) {
-                p1.pos.y = yWindow - p1.size;
-                p1.vel.y *= -damping;
-            } else if (p1.pos.y < p1.size) {
-                p1.pos.y = p1.size;
-                p1.vel.y *= -damping;
-            } if (params.acc) p1.vel.y += p1.acc.y * dt;
-
-            // if (Math.abs(p1.vel.x) < 5) p1.vel.x = 0;
-            // if (Math.abs(p1.vel.y) < 5) p1.vel.y = 0;
-
-
-            p1.vel_next.x = p1.vel.x;
-            p1.vel_next.y = p1.vel.y;
-
-            // if (Math.abs(p1.vel.x) < 0.2) p1.vel.x = 0;
-            // if (Math.abs(p1.vel.y) < 0.2) p1.vel.y = 0;
-
-            // ----- draw -----
-            ctx.beginPath();
-            ctx.ellipse(p1.pos.x, p1.pos.y, p1.size, p1.size, 0, 0, 2 * Math.PI);
-            // ctx.rect(p1.pos.x - p1.size, p1.pos.y - p1.size, p1.size * 2, p1.size * 2);
-            ctx.fill();
-        }
-
-        let t1 = Date.now();
-
-        for (let i = 0; i < objs.length; i++) {
-            let p1 = objs[i];
-
-            for (let j = i + 1; j < objs.length; j++) {
-                let p2 = objs[j];
-
-                let dx = p1.pos.x - p2.pos.x;
-                let dy = p1.pos.y - p2.pos.y;
-
-                let d = Math.sqrt(dx ** 2 + dy ** 2);
-
-                let closeness = (p1.size + p2.size) - d;
-                if (closeness >= 0) {
-                    p1.collide(p2);
-
-                    // move the objects away from eachother
-
-                    p1.pos.x += dx * closeness / (2 * d);
-                    p2.pos.x -= dx * closeness / (2 * d);
-
-                    p1.pos.y += dy * closeness / (2 * d);
-                    p2.pos.y -= dy * closeness / (2 * d);
-                }
-            }
-
-            p1.vel.x = p1.vel_next.x;
-            p1.vel.y = p1.vel_next.y;
-        }
-        let t2 = Date.now();
-
-        console.log(`draw: ${t1 - t0}ms\tcollide: ${t2 - t1}ms`);
-
-        // let ke = 0;
-        // let mv = 0;
-        // for (let i = 0; i < objs.length; i++) {
-        //     let p = objs[i];
-
-        //     ke += 0.5 * p.m * (p.vel.x ** 2 + p.vel.y ** 2);
-        //     mv += p.m * Math.sqrt(p.vel.x ** 2 + p.vel.y ** 2);
-        // }
-
-        // console.log(ke, mv)
-
-        ctx.fillStyle = `#000000`;
-        ctx.fillText(`${Math.round(1 / dt_actual)} fps`, xWindow, 0);
-
-        prev_update = time;
-
-        requestAnimationFrame(run_sim);
-    }
-
+window.onload = e => {
+    init();
     requestAnimationFrame(run_sim);
 }
