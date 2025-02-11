@@ -34,11 +34,12 @@ float C = 0;
 float PI = 3.1415926535897932384626433832795;
 int count = 4000;
 float damping = 0.8;
+float viscosity = 0;
 
-float r = 4;
+float r = 2;
 
-int max_x = 800;
-int max_y = 800;
+int max_x = 400;
+int max_y = 1200;
 
 int thread_count = 16;
 
@@ -90,6 +91,7 @@ void interact(int params[]) {
 			float d = sqrt(dx * dx + dy * dy);
 
 			float closeness = (objs[j].r + objs[j].r) - d;
+
 			if (closeness >= 0) {
 				collide(i, j, objs);
 
@@ -100,6 +102,17 @@ void interact(int params[]) {
 
 				objs[i].pos.y += dy * closeness / (2 * d);
 				objs[j].pos.y -= dy * closeness / (2 * d);
+			} else if (closeness >= -viscosity) {
+				float scale = (-viscosity - closeness) * viscosity / 5;
+
+				float add_x = scale * dx / d;
+				float add_y = scale * dy / d;
+
+				objs[i].vel_next.x += add_x;
+				objs[j].vel_next.x -= add_x;
+
+				objs[i].vel_next.y += add_y;
+				objs[j].vel_next.y -= add_y;
 			}
 		}
 
@@ -158,6 +171,7 @@ void init() {
 	objs = malloc(sizeof(obj) * count);
 
 	for (int i = 0; i < count; i++) {
+
 		sfCircleShape *shape = sfCircleShape_create();
 		sfVector2f origin = {r, r};
 
@@ -169,8 +183,8 @@ void init() {
 		sfCircleShape_setRadius(shape, r);
 		sfCircleShape_setFillColor(shape, sfWhite);
 
-		sfVector2f acc = {0, 10};
-		sfVector2f vel = {rng(100) - 50, rng(100) - 50};
+		sfVector2f acc = {0, 500};
+		sfVector2f vel = {rng(1000) - 500, rng(1000) - 500};
 		sfVector2f vel_next = {0};
 
 		objs[i].pos = pos;
@@ -221,7 +235,7 @@ int main(int argc, char *argv[]) {
 		sfRenderWindow_clear(window, sfBlack);
 
 		// float dt = (float)sfClock_restart(timer).microseconds / 100000;
-		float dt = 0.1;
+		float dt = 0.01;
 
 		sfInt64 t0 = sfClock_restart(logger).microseconds;
 		draw(dt);
