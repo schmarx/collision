@@ -32,14 +32,14 @@ int *params;
 // TODO: double rather than float?
 float C = 0;
 float PI = 3.1415926535897932384626433832795;
-int count = 4000;
+int count = 6000;
 float damping = 0.8;
 float viscosity = 0;
 
-float r = 2;
+float r = 3;
 
-int max_x = 400;
-int max_y = 1200;
+int max_x = 800;
+int max_y = 1000;
 
 int thread_count = 16;
 
@@ -97,23 +97,34 @@ void interact(int params[]) {
 
 				// move the objects away from eachother
 
-				objs[i].pos.x += dx * closeness / (2 * d);
-				objs[j].pos.x -= dx * closeness / (2 * d);
+				float v1 = sqrt(objs[i].vel.x * objs[i].vel.x + objs[i].vel.y * objs[i].vel.y);
+				float v2 = sqrt(objs[j].vel.x * objs[j].vel.x + objs[j].vel.y * objs[j].vel.y);
 
-				objs[i].pos.y += dy * closeness / (2 * d);
-				objs[j].pos.y -= dy * closeness / (2 * d);
-			} else if (closeness >= -viscosity) {
-				float scale = (-viscosity - closeness) * viscosity / 5;
+				float v_total = v1 + v2;
 
-				float add_x = scale * dx / d;
-				float add_y = scale * dy / d;
+				float v_p1 = v1 / v_total;
+				float v_p2 = v2 / v_total;
 
-				objs[i].vel_next.x += add_x;
-				objs[j].vel_next.x -= add_x;
+				// let r1 = (p1.pos.x - p2.pos.x) - (p1.vel.x - p2.vel.x) * t;
 
-				objs[i].vel_next.y += add_y;
-				objs[j].vel_next.y -= add_y;
+				objs[i].pos.x += dx * closeness * v_p1 / d;
+				objs[j].pos.x -= dx * closeness * v_p2 / d;
+
+				objs[i].pos.y += dy * closeness * v_p1 / d;
+				objs[j].pos.y -= dy * closeness * v_p2 / d;
 			}
+			// else if (closeness >= -viscosity) {
+			// 	float scale = (-viscosity - closeness) * viscosity / 5;
+
+			// 	float add_x = scale * dx / d;
+			// 	float add_y = scale * dy / d;
+
+			// 	objs[i].vel_next.x += add_x;
+			// 	objs[j].vel_next.x -= add_x;
+
+			// 	objs[i].vel_next.y += add_y;
+			// 	objs[j].vel_next.y -= add_y;
+			// }
 		}
 
 		objs[i].vel.x = objs[i].vel_next.x;
